@@ -1,80 +1,85 @@
-name: Deploy to Environment
+name: Deploy
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment'
+        description: Target environment
         required: true
         type: choice
         options:
-          - development
           - staging
           - production
       version:
-        description: 'Version/Tag to deploy (e.g., v0.1.2-alpha or latest)'
+        description: Image tag to deploy
         required: true
-        default: 'latest'
+        default: latest
+      apply:
+        description: Apply manifests to a cluster using KUBE_CONFIG_B64
+        required: true
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
-    name: Deploy to ${{ github.event.inputs.environment }}
-    runs-on: [self-hosted, ccs-runner, ccs-core]
-    environment: ${{ github.event.inputs.environment }}
-    permissions:
-      contents: read
-      packages: read
+    name: Deploy ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.environment }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+        uses: azure/setup-kubectl@v4
         with:
-          version: 'latest'
+          version: latest
 
-      - name: Configure kubectl context
+      - name: Show deployment plan
         run: |
-          # Configure kubectl to use the appropriate cluster
-          # This will depend on your Kubernetes setup
-          echo "Configuring kubectl for ${{ github.event.inputs.environment }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}"
+          echo "Apply enabled: ${{ inputs.apply }}"
 
-      - name: Update Kubernetes manifests
+      - name: Apply manifests when explicitly enabled
+        env:
+          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
         run: |
-          cd k8s/${{ github.event.inputs.environment }}
-          # Update image tags in manifests
-          sed -i "s|image:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.version }}|g" deployment.yaml
+          if [ "${{ inputs.apply }}" != "true" ]; then
+            echo "Dry run only. Set apply=true and KUBE_CONFIG_B64 to deploy."
+            exit 0
+          fi
 
-      - name: Apply Kubernetes manifests
-        run: |
-          kubectl apply -f k8s/${{ github.event.inputs.environment }}/
-
-      - name: Verify deployment
-        run: |
-          kubectl rollout status deployment/reflectai-app -n reflectai-${{ github.event.inputs.environment }}
-
-      - name: Run smoke tests
-        run: |
-          echo "Running smoke tests..."
-          # Add smoke test commands here
-          kubectl get pods -n reflectai-${{ github.event.inputs.environment }}
-
-  notify:
-    name: Notify Deployment Status
-    runs-on: [self-hosted, ccs-runner, ccs-core]
-    needs: [deploy]
-    if: always()
-    steps:
-      - name: Send notification
-        run: |
-          if [ "${{ needs.deploy.result }}" == "success" ]; then
-            echo "✅ Deployment to ${{ github.event.inputs.environment }} succeeded"
-          else
-            echo "❌ Deployment to ${{ github.event.inputs.environment }} failed"
+          if [ -z "$KUBE_CONFIG_B64" ]; then
+            echo "KUBE_CONFIG_B64 secret is required when apply=true."
             exit 1
           fi
+
+          mkdir -p "$HOME/.kube"
+          echo "$KUBE_CONFIG_B64" | base64 --decode > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+          overlay="k8s/overlays/${{ inputs.environment }}"
+          if [ ! -f "$overlay/kustomization.yaml" ]; then
+            echo "Missing kustomize overlay: $overlay/kustomization.yaml"
+            exit 1
+          fi
+
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            namespace="reflectai"
+          else
+            namespace="reflectai-${{ inputs.environment }}"
+          fi
+
+          kubectl kustomize "$overlay" \
+            | sed "s|ghcr.io/reflectai/platform:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}|g" \
+            | kubectl apply -f -
+          kubectl rollout status deployment/reflectai-app -n "$namespace"
