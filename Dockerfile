@@ -25,6 +25,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Stage 2: Build Dependencies
 # ===============================================================================
 FROM base AS builder
+ARG PDM_VERSION
 
 # Install system dependencies for building (minimal set)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -34,8 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Install PDM
-RUN pip install pdm==${PDM_VERSION}
+# Install PDM and its runtime compatibility dependency.
+RUN pip install six pdm==${PDM_VERSION}
 
 # Set working directory
 WORKDIR /app
@@ -93,7 +94,7 @@ COPY pyproject.toml pdm.lock* ./
 
 # Install all dependencies (including dev)
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install pdm==${PDM_VERSION} && \
+    pip install six pdm==${PDM_VERSION} && \
     pdm config venv.in_project true && \
     pdm install --no-self
 
