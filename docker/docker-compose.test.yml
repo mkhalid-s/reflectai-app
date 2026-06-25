@@ -1,0 +1,41 @@
+# Docker Compose for Testing Environment
+# Use with: docker compose -f docker-compose.yml -f docker/docker-compose.test.yml up
+
+version: '3.9'
+
+services:
+  app:
+    build:
+      target: testing
+    environment:
+      ENVIRONMENT: testing
+      LOG_LEVEL: DEBUG
+      TESTING: "true"
+    command: ["pdm", "run", "pytest", "-v", "--cov=src", "--cov-report=xml", "--cov-report=term"]
+    volumes:
+      - ./src:/app/src:ro
+      - ./tests:/app/tests:ro
+      - ./coverage:/app/coverage
+
+  # Test database (separate from dev)
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: reflectai-postgres-test
+    environment:
+      POSTGRES_DB: reflectai_test
+      POSTGRES_USER: reflectai
+      POSTGRES_PASSWORD: testpassword
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - reflectai-network
+
+  # Test Redis (in-memory)
+  redis-test:
+    image: redis:7-alpine
+    container_name: reflectai-redis-test
+    command: redis-server --save ""
+    tmpfs:
+      - /data
+    networks:
+      - reflectai-network

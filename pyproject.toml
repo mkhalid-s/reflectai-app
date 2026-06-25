@@ -1,0 +1,208 @@
+[project]
+name = "reflectai"
+version = "0.1.2-alpha"
+description = "AI-powered competency analysis system"
+authors = [{name = "ReflectAI Team"}]
+requires-python = ">=3.11,<3.13"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Core Dependencies
+    "fastapi>=0.104.1",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.5.0",
+    "pydantic[email]>=2.5.0",
+    "pydantic-settings>=2.1.0",
+
+    # Database
+    "sqlalchemy>=2.0.23",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+
+    # Cache
+    "redis>=5.0.1",
+
+    # LLM Integration
+    "httpx>=0.25.2",
+    "aiohttp>=3.12.15",
+    "openai>=1.3.0",
+    "litellm>=1.0.0",
+
+    # Temporal Workflows
+    "temporalio>=1.4.0",
+
+    # Slack Integration
+    "slack-sdk>=3.24.0",
+    "slack-bolt>=1.18.0",
+
+    # Logging and Monitoring
+    "structlog>=23.2.0",
+    "prometheus-client>=0.19.0",
+
+    # Security and Config
+    "cryptography>=46.0.2",
+    "python-jose>=3.3.0",
+    "doppler-sdk>=1.2.0",
+    "certifi>=2023.0.0",
+
+    # Utilities
+    "python-multipart>=0.0.6",
+    "python-dateutil>=2.8.2",
+    "tenacity>=8.2.0",
+    "psutil>=5.9.0",
+    "numpy>=1.24.0",
+    "madoka>=0.7.1",
+
+    # Report Generation
+    "weasyprint>=60.0.0",
+    "jinja2>=3.1.0",
+    "Pillow>=10.0.0",
+    "cairocffi>=1.6.0",
+]
+
+[dependency-groups]
+dev = [
+    # Development Tools
+    "ruff>=0.1.6",
+    "mypy>=1.7.0",
+    "pre-commit>=3.5.0",
+    "bandit>=1.7.5",
+    "safety>=2.3.0",
+
+    # Testing
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "testcontainers>=3.7.0",
+    "factory-boy>=3.3.0",
+    "faker>=20.1.0",
+]
+
+docs = [
+    # Documentation (optional - can fail without affecting core)
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.4.0",
+]
+
+optional = [
+    # Optional packages that may require system dependencies
+    # These can be installed separately if needed
+    "boto3>=1.34.0",  # AWS SDK (only needed for AWS Bedrock/SigV4)
+]
+
+[project.scripts]
+reflectai = "src.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+# Tool Configurations
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "W191",  # indentation contains tabs
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.mypy]
+python_version = "3.11"
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+strict_equality = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "temporalio.*",
+    "slack_sdk.*",
+    "slack_bolt.*",
+    "testcontainers.*",
+    "factory_boy.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-v --cov=src --cov-report=html --cov-report=term-missing"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests for individual components",
+    "integration: Integration tests across components",
+    "e2e: End-to-end tests for complete workflows",
+    "slow: Tests that take longer to run",
+    "phase1: Phase 1 - Security-First Foundation tests",
+    "phase2: Phase 2 - AI Agent Foundation tests",
+    "phase3: Phase 3 - Enhanced AI & Integrations tests",
+    "phase4: Phase 4 - Production Infrastructure tests",
+    "phase5: Phase 5 - Tool Framework & Business Logic tests",
+    "performance: Performance benchmark tests",
+    "security: Security-focused tests",
+    "llm: Tests requiring LLM integration (OpenAI, EnterpriseGateway, etc.)",
+    "database: Tests requiring database connectivity (PostgreSQL, TimescaleDB)",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".backup"]
+skips = ["B101"]  # Skip assert_used tests
+severity = "medium"
+
+[tool.bandit.assert_used]
+skips = ["*_test.py", "test_*.py"]

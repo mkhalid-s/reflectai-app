@@ -1,0 +1,60 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: reflectai-app-pdb
+  namespace: reflectai
+  labels:
+    app: reflectai
+    component: pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: reflectai
+      component: backend
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: reflectai-nginx-pdb
+  namespace: reflectai
+  labels:
+    app: reflectai
+    component: nginx-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: reflectai
+      component: nginx
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: timescaledb-pdb
+  namespace: reflectai
+  labels:
+    app: timescaledb
+    component: pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: timescaledb
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-pdb
+  namespace: reflectai
+  labels:
+    app: redis
+    component: pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: redis

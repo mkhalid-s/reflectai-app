@@ -1,0 +1,201 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+debug.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# mypy
+.mypy_cache/
+.dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Ruff linter cache
+.ruff_cache/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Databases
+*.db
+data/*.db
+data/reflectai.db
+
+# Virtual Environments
+venv/
+.venv/
+.pdm-python
+
+# Environment
+.env
+.env.dev
+.env.prod
+.env.local
+.env.production
+.env.development
+.env.staging
+# Allow template files
+!.env.template
+!.env.example
+
+# Local/private configuration
+.claude/settings.local.json
+.cursor/
+*.local.json
+software-catalog.yaml
+private-catalog*.yaml
+private-catalog*.yml
+
+# Other
+*.bak
+*.swp
+
+# Fresh Implementation Specific
+
+# Secrets and Security
+*.pem
+*.key
+*.crt
+config/secrets/
+doppler.yaml
+
+# Database files
+*.sqlite
+postgresql_data/
+dump.rdb
+
+# Infrastructure
+temporal-data/
+prometheus_data/
+grafana_data/
+
+# Cache
+.cache/
+.tmp/
+tmp/
+
+# Reports and artifacts
+reports/
+artifacts/
+*.pdf
+*.xlsx
+
+# Docker
+.dockerignore
+Dockerfile.local
+
+# Backup (but keep .backup/ structure for migration)
+.backup/
+
+# IDEs
+.idea/
+
+# Monitoring and logging
+*.log
+logs/
+
+# Copilot/AI Documentation
+# Keep organized in docs/ subdirectories only
+# Ignore root-level analysis documents
+/*_ANALYSIS.md
+/*_REVIEW*.md
+/*_REPORT*.md
+/*_SUMMARY*.md
+/*_GUIDE*.md
+/*_FIXES*.md
+/*CONSOLIDATION*.md
+
+# Debug and test scripts in root (temporary files)
+/test_*.py
+/debug_*.py
+/*.sh

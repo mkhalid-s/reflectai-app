@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reflectai
+  labels:
+    app: reflectai
+    environment: production
+    version: v1.2
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reflectai-staging
+  labels:
+    app: reflectai
+    environment: staging
+    version: v1.2
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reflectai-dev
+  labels:
+    app: reflectai
+    environment: development
+    version: v1.2

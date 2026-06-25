@@ -1,0 +1,81 @@
+# ReflectAI Maintenance Cron Jobs
+# These jobs replace TimescaleDB's automatic policies
+#
+# To install these cron jobs:
+# 1. Edit this file with your actual paths
+# 2. Run: crontab -e
+# 3. Copy and paste the relevant lines below
+# 4. Save and exit
+#
+# Cron format: minute hour day month weekday command
+# * * * * * command to execute
+# ┬ ┬ ┬ ┬ ┬
+# │ │ │ │ └─ day of week (0-7, Sunday = 0 or 7)
+# │ │ │ └─── month (1-12)
+# │ │ └───── day of month (1-31)
+# │ └─────── hour (0-23)
+# └───────── minute (0-59)
+
+# =====================================================
+# MATERIALIZED VIEW REFRESH
+# =====================================================
+
+# Refresh hourly materialized views (every hour)
+0 * * * * /path/to/reflectai-platform/scripts/maintenance/run_refresh.sh >> /path/to/reflectai-platform/logs/maintenance/cron.log 2>&1
+
+# Alternative: Refresh only during business hours (9 AM - 6 PM)
+# 0 9-18 * * * /path/to/reflectai-platform/scripts/maintenance/run_refresh.sh >> /path/to/reflectai-platform/logs/maintenance/cron.log 2>&1
+
+# =====================================================
+# DATA RETENTION / CLEANUP
+# =====================================================
+
+# Run data cleanup weekly (Sunday at 3 AM)
+0 3 * * 0 /path/to/reflectai-platform/scripts/maintenance/run_cleanup.sh >> /path/to/reflectai-platform/logs/maintenance/cron.log 2>&1
+
+# Alternative: Run daily at 2 AM (for more aggressive cleanup)
+# 0 2 * * * /path/to/reflectai-platform/scripts/maintenance/run_cleanup.sh >> /path/to/reflectai-platform/logs/maintenance/cron.log 2>&1
+
+# =====================================================
+# DATABASE MAINTENANCE
+# =====================================================
+
+# Run VACUUM ANALYZE weekly (Sunday at 4 AM, after cleanup)
+0 4 * * 0 docker exec reflectai-postgres psql -U reflectai -d reflectai -c "VACUUM ANALYZE;" >> /path/to/reflectai-platform/logs/maintenance/cron.log 2>&1
+
+# =====================================================
+# LOG ROTATION
+# =====================================================
+
+# Clean up old maintenance logs (monthly, keep last 90 days)
+0 5 1 * * find /path/to/reflectai-platform/logs/maintenance -name "*.log" -mtime +90 -delete >> /path/to/reflectai-platform/logs/maintenance/cron.log 2>&1
+
+# =====================================================
+# MONITORING & ALERTS
+# =====================================================
+
+# Check table sizes and alert if approaching thresholds (daily at 6 AM)
+0 6 * * * /path/to/reflectai-platform/scripts/maintenance/check_table_sizes.sh >> /path/to/reflectai-platform/logs/maintenance/cron.log 2>&1
+
+# =====================================================
+# DOCKER-SPECIFIC (if running in container)
+# =====================================================
+
+# If running maintenance inside Docker container, use:
+# 0 * * * * docker exec reflectai-app /app/scripts/maintenance/run_refresh.sh >> /var/log/reflectai/cron.log 2>&1
+# 0 3 * * 0 docker exec reflectai-app /app/scripts/maintenance/run_cleanup.sh >> /var/log/reflectai/cron.log 2>&1
+
+# =====================================================
+# PRODUCTION RECOMMENDATIONS
+# =====================================================
+#
+# Hourly Refresh: Run every hour during business hours
+# Daily Cleanup: Run once daily during off-peak hours (2-4 AM)
+# Weekly Vacuum: Run once weekly after cleanup
+# Monthly Log Rotation: Keep 90 days of logs
+#
+# Adjust schedules based on:
+# - User activity patterns
+# - Data growth rate
+# - Available maintenance windows
+# - Storage constraints

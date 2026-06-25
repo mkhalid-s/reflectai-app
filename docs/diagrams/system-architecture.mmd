@@ -1,0 +1,249 @@
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#1e40af','primaryTextColor':'#fff','primaryBorderColor':'#3b82f6','lineColor':'#6366f1','secondaryColor':'#10b981','tertiaryColor':'#f59e0b'}}}%%
+
+graph TB
+    %% External Interfaces Layer
+    subgraph External["🌐 EXTERNAL INTERFACES"]
+        Slack[("👥 Slack<br/>Socket Mode<br/>Primary UI")]
+        RestAPI[("🔌 REST API<br/>Future")]
+        WebPortal[("💻 Web Portal<br/>Future")]
+    end
+
+    %% Application Layer
+    subgraph AppLayer["📱 APPLICATION LAYER - FastAPI"]
+        subgraph WebServer["HTTP Server (Uvicorn)"]
+            Port3000["Port 3000<br/>Main App"]
+            Port8080["Port 8080<br/>Prometheus Metrics"]
+            Port8090["Port 8090<br/>Health Checks"]
+        end
+
+        subgraph Adapters["Interface Adapters"]
+            SlackAdapter["Slack Adapter<br/>socket_handler.py<br/>Event Deduplication"]
+            APIRoutes["API Routes<br/>FastAPI Endpoints"]
+            AuthMiddleware["Auth Middleware<br/>OAuth2"]
+            ErrorMiddleware["Error & Logging<br/>Correlation IDs"]
+        end
+    end
+
+    %% Business Logic Layer
+    subgraph BusinessLogic["🧠 BUSINESS LOGIC LAYER"]
+        subgraph CoreEngines["Core Processing Engines"]
+            LLMGateway["🤖 LLM Gateway<br/>gateway.py + LiteLLM<br/>━━━━━━━━━━<br/>• EnterpriseGateway (primary)<br/>• OpenAI<br/>• Anthropic<br/>• Failover & Retry<br/>• Cost Tracking<br/>• Response Cache"]
+
+            ClassificationEngine["🏷️ Classification Engine<br/>━━━━━━━━━━<br/>• Intent Analysis<br/>• Activity Classification<br/>• Competency Mapping<br/>• Trend Detection"]
+
+            AssessmentEngine["📊 Assessment Engine<br/>━━━━━━━━━━<br/>• Competency Scoring (1-5)<br/>• Gap Analysis<br/>• Level Calculation<br/>• Time Decay Algorithm"]
+        end
+
+        subgraph BusinessEngines["Business Engines"]
+            CareerPath["Career Path Engine<br/>Promotion Analysis"]
+            Analytics["Analytics Engine<br/>Metrics Aggregation"]
+            Reporting["Reporting Engine<br/>PDF Generation"]
+            Notification["Notification Engine<br/>Slack & Email"]
+        end
+
+        subgraph Agents["AI Agent System"]
+            AdvisorAgent["Advisor Agent<br/>Goals & Reports"]
+            AnalysisAgent["Analysis Agent<br/>Database Queries"]
+            ChatResponder["Chat Responder<br/>Conversations"]
+        end
+
+        subgraph Conversation["Conversation Management"]
+            ConvIntelligence["Conversation Intelligence<br/>━━━━━━━━━━<br/>• Context Tracking<br/>• Message History (20 max)<br/>• LLM Compaction (20→5+summary)<br/>• Intent Routing"]
+            ContextManager["Context Manager<br/>Redis-backed<br/>TTL: 24h"]
+        end
+    end
+
+    %% Workflow Orchestration Layer
+    subgraph WorkflowLayer["⚙️ WORKFLOW ORCHESTRATION - Temporal"]
+        TemporalServer["Temporal Server<br/>Port 7233<br/>━━━━━━━━━━<br/>• Workflow State Storage<br/>• Task Queue Management<br/>• Retry & Timeout Handling<br/>• Exactly-Once Execution"]
+
+        subgraph Workflows["Workflows (Deterministic)"]
+            AssessmentWF["CompetencyAssessmentWorkflow<br/>Duration: 8-15s<br/>6 activities"]
+            ReportWF["ReportGenerationWorkflow<br/>Duration: 5-6 min<br/>7 activities"]
+            CareerWF["CareerPathWorkflow<br/>Duration: 15-30s<br/>8 activities"]
+            BatchWF["BatchProcessingWorkflow<br/>Duration: 2-10 min<br/>10+ activities"]
+        end
+
+        subgraph Workers["Worker Pool"]
+            Worker1["Worker Container<br/>━━━━━━━━━━<br/>Task Queues:<br/>• competency-tasks<br/>• report-tasks<br/>• analysis-tasks<br/>• notification-tasks"]
+            Worker2["Embedded Workers<br/>(App Container)<br/>Urgent tasks only"]
+        end
+
+        subgraph Activities["Activities (Non-Deterministic)"]
+            DBActivities["Database Operations<br/>Queries, Updates"]
+            LLMActivities["LLM API Calls<br/>Generation, Analysis"]
+            ExtActivities["External APIs<br/>Slack, Resources"]
+            FileActivities["File I/O<br/>PDF Generation"]
+        end
+    end
+
+    %% Infrastructure Layer
+    subgraph Infrastructure["🏗️ INFRASTRUCTURE LAYER"]
+        subgraph ConfigSec["Configuration & Security"]
+            ConfigMgr["Config Manager<br/>Pydantic Settings"]
+            SecretsMgr["Secrets Manager<br/>Doppler SDK"]
+            Security["Security Layer<br/>Auth, Audit, RBAC"]
+        end
+
+        subgraph Monitoring["Monitoring & Observability"]
+            Logging["Structured Logging<br/>structlog<br/>Correlation IDs"]
+            Metrics["Prometheus Metrics<br/>Port 8080"]
+            HealthChecks["Health Checks<br/>Port 8090<br/>12-point validation"]
+        end
+
+        subgraph Cache["Cache Management"]
+            RedisMgr["Redis Manager<br/>redis.asyncio<br/>━━━━━━━━━━<br/>• Session cache<br/>• LLM cache (24h)<br/>• Conversation (24h)<br/>• Rate limiting<br/>• Event dedup (1h)"]
+            MemCache["Memory Fallback<br/>Redis unavailable"]
+        end
+    end
+
+    %% Data Storage Layer
+    subgraph DataLayer["💾 DATA STORAGE LAYER"]
+        subgraph PrimaryDB["PostgreSQL 15 + TimescaleDB"]
+            UsersTbl[("users<br/>Slack ID, Profile JSONB")]
+            ActivitiesTbl[("activities<br/>Activity History")]
+            CompetenciesTbl[("competencies<br/>Current Scores 0-5")]
+            CompHistoryTbl[("competency_history<br/>TimescaleDB Hypertable<br/>Time-series Trends")]
+            ReportsTbl[("reports<br/>PDF Metadata<br/>30-day TTL")]
+            SessionsTbl[("user_sessions<br/>Session Management")]
+        end
+
+        RedisCache[("🔴 Redis 7/8<br/>Port 6379<br/>━━━━━━━━━━<br/>Memory: 512MB<br/>Policy: LRU<br/>AOF: Enabled<br/>━━━━━━━━━━<br/>Keys:<br/>• session:*<br/>• conversation:*<br/>• llm:cache:*<br/>• event_dedup:*<br/>• rate_limit:*")]
+
+        FileStorage[("📁 File System<br/>reports/output/<br/>PDF Reports<br/>30-day cleanup")]
+    end
+
+    %% External Systems
+    subgraph ExternalSystems["🌍 EXTERNAL SYSTEMS"]
+        SlackAPI["Slack API<br/>Socket Mode<br/>Events, Messages<br/>File Uploads"]
+
+        subgraph LLMProviders["LLM Providers"]
+            EnterpriseGateway["EnterpriseGateway<br/>OAuth2<br/>Enterprise LLM"]
+            OpenAI["OpenAI<br/>GPT-4, GPT-3.5"]
+            Anthropic["Anthropic<br/>Claude 3.5"]
+        end
+
+        Doppler["Doppler<br/>Secrets Management<br/>API Keys, Credentials"]
+    end
+
+    %% Data Flow Connections - External to App
+    Slack -->|"WebSocket<br/>Events"| SlackAdapter
+    RestAPI -->|"HTTP/JSON"| APIRoutes
+    WebPortal -->|"HTTP/JSON"| APIRoutes
+
+    %% App Layer to Business Logic
+    SlackAdapter -->|"Deduplicated<br/>Events"| ConvIntelligence
+    SlackAdapter -->|"Commands"| ClassificationEngine
+    APIRoutes -->|"API Requests"| AssessmentEngine
+    AuthMiddleware -.->|"Validate"| SlackAdapter
+    ErrorMiddleware -.->|"Log & Track"| SlackAdapter
+
+    %% Business Logic Internal Flow
+    ConvIntelligence -->|"Intent<br/>Classification"| ClassificationEngine
+    ConvIntelligence <-->|"Load/Save<br/>Context"| ContextManager
+    ClassificationEngine -->|"Competency<br/>Mapping"| AssessmentEngine
+    AssessmentEngine -->|"Scores &<br/>Gaps"| CareerPath
+    AssessmentEngine -->|"Assessment<br/>Results"| Reporting
+
+    %% LLM Gateway Integration
+    ConvIntelligence -->|"Summarize<br/>Context"| LLMGateway
+    ClassificationEngine -->|"Classify<br/>Activity"| LLMGateway
+    Reporting -->|"Generate<br/>Summary"| LLMGateway
+    AdvisorAgent -->|"Recommendations"| LLMGateway
+
+    %% Conversation Management
+    ContextManager -->|"Store/Retrieve<br/>conversation:*<br/>TTL: 24h"| RedisMgr
+
+    %% Business Logic to Workflows
+    ConvIntelligence -->|"Start<br/>Workflows"| TemporalServer
+    AssessmentEngine -->|"Trigger<br/>Assessment"| AssessmentWF
+    Reporting -->|"Trigger<br/>Report Gen"| ReportWF
+    CareerPath -->|"Trigger<br/>Career Analysis"| CareerWF
+
+    %% Workflow Orchestration
+    TemporalServer -->|"Distribute<br/>Tasks"| Worker1
+    TemporalServer -->|"Distribute<br/>Tasks"| Worker2
+
+    Worker1 -->|"Execute"| DBActivities
+    Worker1 -->|"Execute"| LLMActivities
+    Worker1 -->|"Execute"| ExtActivities
+    Worker1 -->|"Execute"| FileActivities
+
+    %% Workflows to Activities
+    AssessmentWF -.->|"Orchestrate"| DBActivities
+    ReportWF -.->|"Orchestrate"| LLMActivities
+    ReportWF -.->|"Orchestrate"| FileActivities
+    CareerWF -.->|"Orchestrate"| DBActivities
+
+    %% Activities to Infrastructure & Data
+    DBActivities -->|"Query/Update"| UsersTbl
+    DBActivities -->|"Query/Update"| ActivitiesTbl
+    DBActivities -->|"Query/Update"| CompetenciesTbl
+    DBActivities -->|"Insert"| CompHistoryTbl
+    DBActivities -->|"Create/Update"| ReportsTbl
+    DBActivities -->|"Manage"| SessionsTbl
+
+    LLMActivities -->|"Generate"| LLMGateway
+    FileActivities -->|"Save PDF"| FileStorage
+    FileActivities -->|"Upload"| SlackAPI
+
+    ExtActivities -->|"Notify"| SlackAPI
+    ExtActivities -->|"Post Message"| SlackAPI
+
+    %% Infrastructure Connections
+    ConfigMgr -->|"Load Config"| AppLayer
+    SecretsMgr -->|"Pull Secrets<br/>at Startup"| Doppler
+    Security -.->|"Validate"| APIRoutes
+    Security -.->|"Audit"| ReportsTbl
+
+    Logging -.->|"Log All"| AppLayer
+    Logging -.->|"Log All"| BusinessLogic
+    Logging -.->|"Log All"| WorkflowLayer
+
+    Metrics -->|"Collect"| Port8080
+    HealthChecks -->|"Expose"| Port8090
+
+    %% LLM Gateway to Providers
+    LLMGateway -->|"Primary<br/>Provider"| EnterpriseGateway
+    LLMGateway -->|"Failover"| OpenAI
+    LLMGateway -->|"Failover"| Anthropic
+
+    %% LLM Gateway Caching
+    LLMGateway <-->|"Cache Responses<br/>llm:cache:*<br/>TTL: 24h"| RedisMgr
+
+    %% Redis Manager Connections
+    RedisMgr <-->|"Connection<br/>Pool"| RedisCache
+    RedisMgr -.->|"Fallback"| MemCache
+
+    %% Session Management
+    SlackAdapter <-->|"Sessions<br/>session:*<br/>TTL: 1-24h"| RedisMgr
+    APIRoutes <-->|"Sessions"| RedisMgr
+
+    %% Event Deduplication
+    SlackAdapter -->|"Check Duplicates<br/>event_dedup:*<br/>TTL: 1h"| RedisMgr
+
+    %% Rate Limiting
+    APIRoutes <-->|"Rate Limits<br/>rate_limit:*<br/>TTL: 1m"| RedisMgr
+
+    %% Temporal Storage
+    TemporalServer <-->|"Workflow State<br/>History"| UsersTbl
+
+    %% External System Connections
+    SlackAdapter <-->|"Send/Receive<br/>Events, Messages"| SlackAPI
+
+    %% Styling
+    classDef external fill:#3b82f6,stroke:#1e40af,stroke-width:3px,color:#fff
+    classDef app fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
+    classDef business fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#000
+    classDef workflow fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    classDef infra fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff
+    classDef data fill:#ec4899,stroke:#db2777,stroke-width:3px,color:#fff
+    classDef extsys fill:#14b8a6,stroke:#0d9488,stroke-width:2px,color:#fff
+
+    class Slack,RestAPI,WebPortal external
+    class SlackAdapter,APIRoutes,AuthMiddleware,ErrorMiddleware,Port3000,Port8080,Port8090 app
+    class LLMGateway,ClassificationEngine,AssessmentEngine,CareerPath,Analytics,Reporting,Notification,AdvisorAgent,AnalysisAgent,ChatResponder,ConvIntelligence,ContextManager business
+    class TemporalServer,AssessmentWF,ReportWF,CareerWF,BatchWF,Worker1,Worker2,DBActivities,LLMActivities,ExtActivities,FileActivities workflow
+    class ConfigMgr,SecretsMgr,Security,Logging,Metrics,HealthChecks,RedisMgr,MemCache infra
+    class UsersTbl,ActivitiesTbl,CompetenciesTbl,CompHistoryTbl,ReportsTbl,SessionsTbl,RedisCache,FileStorage data
+    class SlackAPI,EnterpriseGateway,OpenAI,Anthropic,Doppler extsys

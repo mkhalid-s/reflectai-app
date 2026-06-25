@@ -1,0 +1,107 @@
+# Pre-commit configuration for ReflectAI development tooling
+
+repos:
+  # Ruff - Lightning fast Python linter (replaces Flake8, Black, isort)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.6
+    hooks:
+      # Linter
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi, jupyter]
+      # Formatter (replaces Black)
+      - id: ruff-format
+        types_or: [python, pyi, jupyter]
+
+  # MyPy - Static type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.7.0
+    hooks:
+      - id: mypy
+        additional_dependencies: 
+          - types-redis
+          - types-requests
+          - types-python-dateutil
+          - pydantic
+        args: [--config-file=pyproject.toml]
+
+  # Bandit - Security linting
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: ['-c', 'pyproject.toml']
+        additional_dependencies: ['bandit[toml]']
+        exclude: ^(tests/|\.backup/)
+
+  # Safety - Dependency security scanning
+  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+    rev: v1.3.2
+    hooks:
+      - id: python-safety-dependencies-check
+        files: pyproject.toml
+        args: ['--ignore=70612']  # Ignore jinja2 security issue (if using older version)
+
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # General file checks
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        exclude: ^(\.backup/|docker-compose\.yml)
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      
+      # Python-specific checks
+      - id: check-ast
+      - id: check-docstring-first
+      - id: debug-statements
+      - id: name-tests-test
+      - id: requirements-txt-fixer
+
+  # Secrets detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^(\.backup/|tests/fixtures/)
+
+# Configuration
+default_stages: [commit, push]
+default_language_version:
+  python: python3.11
+
+# Exclude patterns
+exclude: |
+  (?x)^(
+    \.backup/.*|
+    migrations/.*|
+    __pycache__/.*|
+    \.git/.*|
+    \.mypy_cache/.*|
+    \.pytest_cache/.*|
+    \.venv/.*|
+    venv/.*|
+    \.coverage.*|
+    htmlcov/.*
+  )$
+
+# CI configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+    
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [safety]  # Skip safety in CI as it requires network access
+  submodules: false

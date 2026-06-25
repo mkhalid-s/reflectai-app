@@ -1,0 +1,53 @@
+# Docker Compose Override for Development Environment
+# Use with: docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up
+
+version: '3.9'
+
+services:
+  app:
+    build:
+      target: development
+    environment:
+      ENVIRONMENT: development
+      LOG_LEVEL: DEBUG
+      DEBUG: "true"
+      RELOAD: "true"
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+      # Mount PDM files
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./pdm.lock:/app/pdm.lock
+    command: ["pdm", "run", "uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "3000", "--reload"]
+
+  # Development tools
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: reflectai-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:devpassword
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin
+    depends_on:
+      - redis
+    networks:
+      - reflectai-network
+
+  # Database admin tool
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: reflectai-pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@reflectai.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      - postgres
+    networks:
+      - reflectai-network

@@ -1,0 +1,33 @@
+# <type>(<scope>): <subject>
+# |<----  Using a Maximum Of 50 Characters  ---->|
+
+# Explain why this change is being made
+# |<----   Try To Limit Each Line to a Maximum Of 72 Characters   ---->|
+
+# Provide links or keys to any relevant tickets, articles or other resources
+# Example: Fixes #123, Closes #456
+
+# --- COMMIT END ---
+# Type can be:
+#   feat     (new feature)
+#   fix      (bug fix)
+#   docs     (documentation)
+#   style    (formatting, no code change)
+#   refactor (refactoring code)
+#   perf     (performance improvement)
+#   test     (adding tests)
+#   build    (build system changes)
+#   ci       (CI/CD changes)
+#   chore    (maintenance)
+#   revert   (reverting a commit)
+# --------------------
+# Remember:
+#   * Use imperative mood in subject line
+#   * Don't capitalize first letter
+#   * No period at the end of subject
+#   * Separate subject from body with blank line
+#   * Wrap body at 72 characters
+#   * Use body to explain what and why vs. how
+# --------------------
+# For more information:
+# https://www.conventionalcommits.org/

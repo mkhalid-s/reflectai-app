@@ -1,0 +1,41 @@
+# ReflectAI Maintenance Cron Jobs (Container)
+# This file is loaded inside the cron container
+# Environment variables are automatically available from docker-compose
+
+# =====================================================
+# MATERIALIZED VIEW REFRESH
+# =====================================================
+
+# Refresh materialized views every hour
+0 * * * * /app/scripts/maintenance/run_refresh.sh >> /var/log/reflectai/cron.log 2>&1
+
+# =====================================================
+# DATA RETENTION / CLEANUP
+# =====================================================
+
+# Run data cleanup weekly (Sunday at 3 AM)
+0 3 * * 0 /app/scripts/maintenance/run_cleanup.sh >> /var/log/reflectai/cron.log 2>&1
+
+# =====================================================
+# MONITORING & ALERTS
+# =====================================================
+
+# Check table sizes daily at 6 AM
+0 6 * * * /app/scripts/maintenance/check_table_sizes.sh >> /var/log/reflectai/cron.log 2>&1
+
+# =====================================================
+# DATABASE MAINTENANCE
+# =====================================================
+
+# Run VACUUM ANALYZE weekly (Sunday at 4 AM, after cleanup)
+0 4 * * 0 PGPASSWORD=$DB_PASSWORD psql -h postgres -p 5432 -U $DB_USER -d $DB_NAME -c "VACUUM ANALYZE;" >> /var/log/reflectai/cron.log 2>&1
+
+# =====================================================
+# LOG ROTATION
+# =====================================================
+
+# Clean up old maintenance logs monthly (keep last 90 days)
+0 5 1 * * find /var/log/reflectai/maintenance -name "*.log" -mtime +90 -delete >> /var/log/reflectai/cron.log 2>&1
+
+# Health check - log heartbeat every hour
+0 * * * * echo "[$(date)] Cron container healthy" >> /var/log/reflectai/cron.log 2>&1

@@ -1,0 +1,309 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+  labels:
+    app: alertmanager
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'smtp.gmail.com:587'
+      smtp_from: 'alerts@reflectai.com'
+      smtp_auth_username: 'alerts@reflectai.com'
+      smtp_auth_password_file: '/etc/alertmanager/secrets/smtp_password'
+
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10m
+      repeat_interval: 1h
+      receiver: 'web.hook.default'
+      routes:
+      # Critical alerts - immediate notification
+      - match:
+          severity: critical
+        receiver: 'critical-alerts'
+        group_wait: 0s
+        repeat_interval: 5m
+        routes:
+        - match:
+            alertname: ReflectAIDown
+          receiver: 'application-down'
+        - match:
+            alertname: DatabaseDown
+          receiver: 'database-alerts'
+
+      # Warning alerts - standard notification
+      - match:
+          severity: warning
+        receiver: 'warning-alerts'
+        group_wait: 30s
+        repeat_interval: 30m
+
+      # Business hours routing
+      - match:
+          severity: warning
+        receiver: 'business-hours-alerts'
+        active_time_intervals:
+        - business_hours
+
+      # Low priority alerts
+      - match:
+          severity: info
+        receiver: 'info-alerts'
+        group_wait: 5m
+        repeat_interval: 12h
+
+    time_intervals:
+    - name: business_hours
+      time_intervals:
+      - times:
+        - start_time: '09:00'
+          end_time: '17:00'
+        weekdays: ['monday:friday']
+        months: ['january:december']
+
+    inhibit_rules:
+    # Inhibit warning alerts if critical alert is firing
+    - source_matchers:
+        - severity = "critical"
+      target_matchers:
+        - severity = "warning"
+      equal: ['alertname', 'instance']
+
+    # Inhibit individual pod alerts if service alert is firing
+    - source_matchers:
+        - alertname = "ServiceDown"
+      target_matchers:
+        - alertname = "PodDown"
+      equal: ['service']
+
+    receivers:
+    - name: 'web.hook.default'
+      webhook_configs:
+      - url: 'http://webhook-service:9093/webhook'
+
+    - name: 'critical-alerts'
+      slack_configs:
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook'
+        channel: '#critical-alerts'
+        title: '🚨 CRITICAL: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Time:* {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ end }}
+        send_resolved: true
+      email_configs:
+      - to: 'oncall@reflectai.com'
+        subject: '🚨 CRITICAL: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ end }}
+
+    - name: 'application-down'
+      slack_configs:
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook'
+        channel: '#critical-alerts'
+        title: '💥 APPLICATION DOWN'
+        text: |
+          ReflectAI application is completely down!
+          {{ range .Alerts }}
+          *Instance:* {{ .Labels.instance }}
+          *Started:* {{ .StartsAt.Format "15:04:05" }}
+          {{ end }}
+        send_resolved: true
+      pagerduty_configs:
+      - routing_key_file: '/etc/alertmanager/secrets/pagerduty_key'
+        description: 'ReflectAI Application Down'
+        severity: 'critical'
+
+    - name: 'database-alerts'
+      slack_configs:
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook'
+        channel: '#database-alerts'
+        title: '🗄️ DATABASE ALERT'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Database:* {{ .Labels.datname }}
+          {{ end }}
+        send_resolved: true
+
+    - name: 'warning-alerts'
+      slack_configs:
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook'
+        channel: '#monitoring'
+        title: '⚠️ Warning: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          {{ end }}
+        send_resolved: true
+
+    - name: 'business-hours-alerts'
+      email_configs:
+      - to: 'team@reflectai.com'
+        subject: '⚠️ ReflectAI Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+
+    - name: 'info-alerts'
+      slack_configs:
+      - api_url_file: '/etc/alertmanager/secrets/slack_webhook'
+        channel: '#monitoring-info'
+        title: 'ℹ️ Info: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        send_resolved: false
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-secrets
+  namespace: monitoring
+  labels:
+    app: alertmanager
+type: Opaque
+stringData:
+  smtp_password: "CHANGE_ME_IN_PRODUCTION"
+  slack_webhook: "https://hooks.slack.com/services/CHANGE_ME_IN_PRODUCTION"
+  pagerduty_key: "CHANGE_ME_IN_PRODUCTION"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9093"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.26.0
+        args:
+          - '--config.file=/etc/alertmanager/alertmanager.yml'
+          - '--storage.path=/alertmanager'
+          - '--data.retention=168h'
+          - '--cluster.listen-address=0.0.0.0:9094'
+          - '--cluster.peer=alertmanager-0.alertmanager:9094'
+          - '--cluster.peer=alertmanager-1.alertmanager:9094'
+          - '--web.external-url=https://alertmanager.reflectai.com'
+        ports:
+        - name: web
+          containerPort: 9093
+        - name: cluster
+          containerPort: 9094
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: alertmanager-config
+          mountPath: /etc/alertmanager/alertmanager.yml
+          subPath: alertmanager.yml
+        - name: alertmanager-secrets
+          mountPath: /etc/alertmanager/secrets
+        - name: alertmanager-storage
+          mountPath: /alertmanager
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: alertmanager-config
+        configMap:
+          name: alertmanager-config
+      - name: alertmanager-secrets
+        secret:
+          secretName: alertmanager-secrets
+      - name: alertmanager-storage
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 9093
+    targetPort: 9093
+  - name: cluster
+    port: 9094
+    targetPort: 9094
+  selector:
+    app: alertmanager
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-headless
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  clusterIP: None
+  ports:
+  - name: web
+    port: 9093
+    targetPort: 9093
+  - name: cluster
+    port: 9094
+    targetPort: 9094
+  selector:
+    app: alertmanager

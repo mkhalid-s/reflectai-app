@@ -1,0 +1,182 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: reflectai-service-account
+  namespace: reflectai
+  labels:
+    app: reflectai
+    component: service-account
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: reflectai-role
+  namespace: reflectai
+  labels:
+    app: reflectai
+    component: rbac
+rules:
+# Allow reading ConfigMaps and Secrets
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+# Allow reading own pod information
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+  resourceNames: []
+# Allow creating events for logging
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+# Allow reading services for service discovery
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: reflectai-role-binding
+  namespace: reflectai
+  labels:
+    app: reflectai
+    component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: reflectai-role
+subjects:
+- kind: ServiceAccount
+  name: reflectai-service-account
+  namespace: reflectai
+
+---
+# Cluster-level permissions for monitoring and metrics
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: reflectai-cluster-role
+  labels:
+    app: reflectai
+    component: cluster-rbac
+rules:
+# Allow reading node metrics for autoscaling
+- apiGroups: [""]
+  resources: ["nodes", "nodes/metrics"]
+  verbs: ["get", "list", "watch"]
+# Allow reading custom metrics
+- apiGroups: ["custom.metrics.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list"]
+# Allow reading external metrics
+- apiGroups: ["external.metrics.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: reflectai-cluster-role-binding
+  labels:
+    app: reflectai
+    component: cluster-rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: reflectai-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: reflectai-service-account
+  namespace: reflectai
+
+---
+# Network Policies for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: reflectai-network-policy
+  namespace: reflectai
+  labels:
+    app: reflectai
+    component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: reflectai
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from nginx
+  - from:
+    - podSelector:
+        matchLabels:
+          app: reflectai
+          component: nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow traffic from same namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: reflectai
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8090  # metrics
+    - protocol: TCP
+      port: 8091  # health
+  # Allow traffic from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8090  # metrics
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow access to TimescaleDB
+  - to:
+    - podSelector:
+        matchLabels:
+          app: timescaledb
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow access to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow access to Temporal
+  - to:
+    - podSelector:
+        matchLabels:
+          app: temporal
+    ports:
+    - protocol: TCP
+      port: 7233
+  # Allow HTTPS outbound for external APIs
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow HTTP outbound for health checks and webhooks
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80

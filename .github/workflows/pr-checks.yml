@@ -1,0 +1,152 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: [self-hosted, ccs-runner, ccs-core]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR title format
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          if ! echo "$PR_TITLE" | grep -qE '^(feat|fix|docs|chore|refactor|test|perf|ci|build|style)(\(.+\))?: .+'; then
+            echo "❌ PR title must follow conventional commits format"
+            echo "Examples: feat: add new feature, fix(core): resolve bug"
+            exit 1
+          fi
+          echo "✅ PR title format is valid"
+
+      - name: Check branch name
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          if ! echo "$BRANCH_NAME" | grep -qE '^(feature|bugfix|hotfix|release)/.+'; then
+            echo "⚠️  Branch name doesn't follow convention (feature/*, bugfix/*, hotfix/*, release/*)"
+          fi
+
+      - name: Check for breaking changes
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD --name-only | \
+            grep -E '(src/shared/|src/core/|pyproject.toml|docker-compose.yml)' && \
+            echo "⚠️  Changes detected in critical files - review carefully" || \
+            echo "✅ No critical file changes detected"
+
+  size-check:
+    name: Check PR Size
+    runs-on: [self-hosted, ccs-runner, ccs-core]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR size
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | wc -l)
+          ADDITIONS=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | grep -oP '\d+(?= insertion)' || echo 0)
+          DELETIONS=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | grep -oP '\d+(?= deletion)' || echo 0)
+          
+          echo "Files changed: $CHANGED_FILES"
+          echo "Lines added: $ADDITIONS"
+          echo "Lines deleted: $DELETIONS"
+          
+          if [ "$CHANGED_FILES" -gt 50 ]; then
+            echo "⚠️  Large PR: $CHANGED_FILES files changed. Consider splitting."
+          fi
+          
+          if [ "$ADDITIONS" -gt 1000 ]; then
+            echo "⚠️  Large PR: $ADDITIONS lines added. Consider splitting."
+          fi
+
+  dependency-check:
+    name: Check Dependencies
+    runs-on: [self-hosted, ccs-runner, ccs-core]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PDM
+        run: |
+          pip install pdm==2.20.1
+
+      - name: Check for dependency changes
+        run: |
+          if git diff origin/${{ github.base_ref }}...HEAD --name-only | grep -q 'pyproject.toml\|pdm.lock'; then
+            echo "📦 Dependency changes detected"
+            pdm install --check
+            pdm list --freeze > current-deps.txt
+            echo "✅ Dependencies are valid"
+          else
+            echo "✅ No dependency changes"
+          fi
+
+  test-coverage:
+    name: Coverage Check
+    runs-on: [self-hosted, ccs-runner, ccs-core]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: reflectai
+          POSTGRES_PASSWORD: reflectai_test
+          POSTGRES_DB: reflectai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PDM
+        run: |
+          pip install pdm==2.20.1
+
+      - name: Install dependencies
+        run: |
+          pdm install --dev
+
+      - name: Run tests with coverage
+        env:
+          DATABASE_URL: postgresql+asyncpg://reflectai:reflectai_test@localhost:5432/reflectai_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pdm run pytest --cov=src --cov-report=term --cov-report=json
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(python -c "import json; print(json.load(open('coverage.json'))['totals']['percent_covered'])")
+          echo "Current coverage: ${COVERAGE}%"
+          
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "❌ Coverage ${COVERAGE}% is below 80% threshold"
+            exit 1
+          else
+            echo "✅ Coverage ${COVERAGE}% meets 80% threshold"
+          fi

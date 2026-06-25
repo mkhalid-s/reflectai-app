@@ -1,0 +1,23 @@
+# Copilot Documentation Rules
+# This file defines where AI-generated documentation should be placed
+
+# Rule 1: All AI analysis goes to docs/copilot/
+COPILOT_DOCS_ROOT="docs/copilot"
+
+# Rule 2: Subdirectory mapping
+# analysis/ - Deep dive analysis, gap analysis, forensic reviews
+# tasks/ - Task lists, quick references, action items
+# plans/ - Cleanup plans, execution guides, step-by-step
+# reviews/ - Implementation reviews, code reviews
+# archive/ - Completed/historical documents
+
+# Rule 3: Naming convention
+# Use kebab-case: gaps-and-redundancies.md
+# Include dates for time-series: review-2025-10-05.md
+# Be descriptive: complete-task-list.md not tasks.md
+
+# Rule 4: Update index
+# Always update docs/copilot/README.md when adding new docs
+
+# Rule 5: Archive old docs
+# Move completed work to docs/copilot/archive/YYYY-MM/

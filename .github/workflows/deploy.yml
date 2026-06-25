@@ -1,0 +1,80 @@
+name: Deploy to Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      version:
+        description: 'Version/Tag to deploy (e.g., v0.1.2-alpha or latest)'
+        required: true
+        default: 'latest'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment }}
+    runs-on: [self-hosted, ccs-runner, ccs-core]
+    environment: ${{ github.event.inputs.environment }}
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl context
+        run: |
+          # Configure kubectl to use the appropriate cluster
+          # This will depend on your Kubernetes setup
+          echo "Configuring kubectl for ${{ github.event.inputs.environment }}"
+
+      - name: Update Kubernetes manifests
+        run: |
+          cd k8s/${{ github.event.inputs.environment }}
+          # Update image tags in manifests
+          sed -i "s|image:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.version }}|g" deployment.yaml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/${{ github.event.inputs.environment }}/
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/reflectai-app -n reflectai-${{ github.event.inputs.environment }}
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests..."
+          # Add smoke test commands here
+          kubectl get pods -n reflectai-${{ github.event.inputs.environment }}
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: [self-hosted, ccs-runner, ccs-core]
+    needs: [deploy]
+    if: always()
+    steps:
+      - name: Send notification
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✅ Deployment to ${{ github.event.inputs.environment }} succeeded"
+          else
+            echo "❌ Deployment to ${{ github.event.inputs.environment }} failed"
+            exit 1
+          fi

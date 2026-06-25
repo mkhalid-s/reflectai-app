@@ -1,0 +1,2 @@
+# This file ensures the docker/certs/ directory exists for Docker COPY
+# Zscaler certificate (zscaler-root-ca.crt) is optional and environment-specific

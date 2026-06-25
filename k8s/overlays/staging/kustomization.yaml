@@ -1,0 +1,54 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: reflectai-staging
+
+resources:
+- ../../base
+- namespace.yaml
+
+images:
+- name: reflectai/platform
+  newName: ghcr.io/reflectai/platform
+  newTag: latest
+
+replicas:
+- name: reflectai-app
+  count: 2
+- name: reflectai-nginx
+  count: 1
+
+patchesStrategicMerge:
+- deployment-patch.yaml
+- configmap-patch.yaml
+- ingress-patch.yaml
+
+patchesJson6902:
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: reflectai-app
+  path: resource-limits-patch.yaml
+
+configMapGenerator:
+- name: reflectai-staging-config
+  literals:
+  - APP_ENV=staging
+  - LOG_LEVEL=DEBUG
+  - ENABLE_DEBUG_LOGGING=true
+  - RATE_LIMIT_REQUESTS_PER_MINUTE=120
+
+secretGenerator:
+- name: reflectai-staging-secrets
+  literals:
+  - DB_HOST=staging-timescaledb-service
+  - REDIS_HOST=staging-redis-service
+
+commonLabels:
+  environment: staging
+  version: v1.2
+
+commonAnnotations:
+  deployment.kubernetes.io/revision: "1"
+  app.kubernetes.io/managed-by: kustomize

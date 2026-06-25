@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reflectai-config
+  namespace: reflectai
+  labels:
+    app: reflectai
+    component: configuration
+data:
+  # Application Configuration
+  APP_ENV: "production"
+  LOG_LEVEL: "INFO"
+  DEBUG: "false"
+
+  # Database Configuration
+  DB_HOST: "timescaledb-service"
+  DB_PORT: "5432"
+  DB_NAME: "reflectai"
+  DB_POOL_SIZE: "20"
+  DB_POOL_MAX_OVERFLOW: "0"
+
+  # Redis Configuration
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_MAX_CONNECTIONS: "100"
+
+  # Temporal Configuration
+  TEMPORAL_HOST: "temporal-frontend"
+  TEMPORAL_PORT: "7233"
+  TEMPORAL_NAMESPACE: "reflectai"
+
+  # Performance Configuration
+  WORKER_PROCESSES: "4"
+  MAX_CONNECTIONS_PER_WORKER: "100"
+  REQUEST_TIMEOUT: "30"
+
+  # Security Configuration
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "60"
+  SESSION_TIMEOUT_MINUTES: "120"
+  MAX_UPLOAD_SIZE_MB: "10"
+
+  # Monitoring Configuration
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "8090"
+  HEALTH_CHECK_PORT: "8091"
+
+  # Feature Flags
+  ENABLE_PERFORMANCE_MONITORING: "true"
+  ENABLE_SECURITY_HARDENING: "true"
+  ENABLE_AUDIT_LOGGING: "true"
+  ENABLE_PRIVACY_COMPLIANCE: "true"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reflectai-nginx-config
+  namespace: reflectai
+  labels:
+    app: reflectai
+    component: nginx
+data:
+  nginx.conf: |
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        # Logging
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        'rt=$request_time uct="$upstream_connect_time" '
+                        'uht="$upstream_header_time" urt="$upstream_response_time"';
+
+        access_log /var/log/nginx/access.log main;
+
+        # Performance
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        client_max_body_size 10M;
+
+        # Security Headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer-when-downgrade" always;
+        add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+        # Rate Limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=login:10m rate=1r/s;
+
+        # Gzip Compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml
+            text/plain
+            text/css
+            text/js
+            text/xml
+            text/javascript;
+
+        # Upstream Backend
+        upstream reflectai_backend {
+            least_conn;
+            server reflectai-service:8000 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+
+        server {
+            listen 80;
+            server_name _;
+
+            # Health Check
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+
+            # API Routes
+            location /api/ {
+                limit_req zone=api burst=20 nodelay;
+
+                proxy_pass http://reflectai_backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_cache_bypass $http_upgrade;
+
+                # Timeouts
+                proxy_connect_timeout 30s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+            }
+
+            # Login endpoint with stricter rate limiting
+            location /api/auth/login {
+                limit_req zone=login burst=5 nodelay;
+
+                proxy_pass http://reflectai_backend;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+
+            # Metrics endpoint (internal only)
+            location /metrics {
+                allow 10.0.0.0/8;
+                allow 172.16.0.0/12;
+                allow 192.168.0.0/16;
+                deny all;
+
+                proxy_pass http://reflectai_backend;
+            }
+
+            # Default location
+            location / {
+                return 404;
+            }
+        }
+    }
